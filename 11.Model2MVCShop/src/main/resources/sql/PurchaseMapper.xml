@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="PurchaseMapper">
+ 	
+ 	
+	<resultMap id="purchaseSelectMap" type="purchase">
+		<result property="buyer.userId" 		column="buyer_id" 			jdbcType="VARCHAR"/>
+		<result property="divyAddr"				column="divy_addr" 			jdbcType="VARCHAR" />
+		<result property="divyDate" 			column="divy_date" 			jdbcType="DATE" />
+		<result property="divyRequest"   		column="divy_request" 		jdbcType="VARCHAR" />
+		<result property="orderDate" 			column="order_date" 		jdbcType="DATE" />
+		<result property="paymentOption" 		column="payment_option" 	jdbcType="CHAR" />
+		<result property="purchaseProd.prodNo" 	column="prod_no" 			jdbcType="NUMERIC" />
+		<result property="receiverName" 		column="receiver_name" 		jdbcType="VARCHAR" />
+		<result property="receiverPhone" 		column="receiver_phone" 	jdbcType="VARCHAR"  />
+		<result property="tranCode" 			column="tran_status_code" 	jdbcType="CHAR"  />
+		<result property="tranNo" 				column="tran_no" 			jdbcType="NUMERIC"  />
+			
+	</resultMap>
+
+	<sql id="select-purchases">
+	SELECT t.tran_no, p.prod_no , t.buyer_id , t.payment_option , t.receiver_name, 
+			t.receiver_phone, t.divy_addr, t.divy_request, t.tran_status_code, t.order_date,t.divy_date 		
+	FROM TRANSACTION t, product p, users u
+	WHERE t.prod_no= p.prod_no 
+		AND t.buyer_id = u.user_id
+		AND u.user_id = #{buyerId}
+	ORDER BY tran_no DESC
+	</sql>
+	
+	<sql id="select-sales">
+	SELECT t.tran_no, p.prod_no , t.buyer_id , t.payment_option , t.receiver_name, 
+			t.receiver_phone, t.divy_addr, t.divy_request, t.tran_status_code, t.order_date,t.divy_date 
+	FROM TRANSACTION t, PRODUCT p, USERS u
+	WHERE t.PROD_NO= p.PROD_NO 
+		AND t.buyer_id = u.user_id
+	ORDER BY tran_no DESC 
+	</sql>
+	
+	<!-- SQL : INSERT -->
+	<insert 	id="addPurchase"	parameterType="purchase" >
+	 	INSERT
+		INTO transaction(tran_no, prod_no, buyer_id, payment_option, receiver_name, 
+ 						receiver_phone, divy_addr, divy_request, divy_date, order_date ) 
+		VALUES	 ( seq_tran_no.NEXTVAL, #{purchaseProd.prodNo} , #{buyer.userId} , #{paymentOption:CHAR} , 
+		#{receiverName:VARCHAR} , #{receiverPhone:VARCHAR} , #{divyAddr:VARCHAR} ,#{divyRequest:VARCHAR} ,
+		 #{divyDate:DATE}, SYSDATE)
+	 </insert>
+	 
+	 <!-- SQL : SELECT ONE -->
+	 <select 	id="getPurchase"	parameterType="int"	resultMap="purchaseSelectMap">
+		 SELECT 
+		 tran_no, prod_no, buyer_id, payment_option, receiver_name, receiver_phone, divy_addr, 
+				 divy_request, divy_date,tran_status_code, order_date 
+			FROM TRANSACTION WHERE tran_no= #{value}
+	 </select>
+	 
+	 <!-- SQL : UPDATE -->
+	 <update	id="updatePurchase"	parameterType="purchase" >
+	   	UPDATE transaction
+	   	<set>
+			payment_option = #{paymentOption:CHAR},
+			receiver_name = #{receiverName:VARCHAR},
+			receiver_phone = #{receiverPhone:VARCHAR},
+			divy_addr = #{divyAddr:VARCHAR},
+			divy_request = #{divyRequest:VARCHAR},
+			divy_date = #{divyDate:DATE}
+	   	</set>
+	   	WHERE tran_no = #{tranNo}
+	 </update>
+	
+	<!-- SQL : UPDATE -->
+	 <update	id="updateTranCode"	parameterType="purchase" >
+	   	UPDATE TRANSACTION 
+		<set>
+			tran_status_code = #{tranCode:CHAR}
+		</set>
+		WHERE tran_no = #{tranNo}
+	</update>
+		
+	<!-- SQL : SELECT LIST -->
+	<select  id="getPurchaseList"  parameterType="map"	resultMap="purchaseSelectMap">
+	  	SELECT *
+	  	FROM (	SELECT inner_table.* , ROWNUM AS row_seq
+	  					 FROM		( 
+	  					 				<include refid = "select-purchases"/>
+	  																	 ) inner_table
+						<where>
+						 ROWNUM <![CDATA[ <=]]> #{search.endRowNum}
+						</where> )
+		<where> 
+			row_seq BETWEEN #{search.startRowNum} AND #{search.endRowNum} 
+		</where>
+	 </select>
+	 
+	 
+	 
+	 	<!--  위 두번째 subQuery 의  
+	 			WHERE ROWNUM &lt;= #{endRowNum} ) 는
+	 			WHERE ROWNUM <= #{endRowNum} ) 의미이며..
+	 			< 는 keyword 로 &lt; 를	사용.
+	 			
+	 			<![CDATA[  ~~~  ]]> 를 이용하여 아래와 같이 사용  할 수 있다.
+	 			CDATA ==> Character Data 의 의미 Java 에서 \n 같은 특수문자 처리  
+
+				WHERE ROWNUM <![CDATA[ <=]]> #{endRowNum} )
+		-->
+		
+			<!-- SQL : SELECT LIST -->
+<select  id="getSaleList"  parameterType="search"	resultMap="purchaseSelectMap">
+		SELECT * FROM (	SELECT inner_table. * ,  ROWNUM AS row_seq  
+						FROM ( 
+								<include refid = "select-sales"/>
+												 					)inner_table 
+						<where>
+						 ROWNUM <![CDATA[ <=]]> #{endRowNum}
+						</where> )
+		<where> 
+			row_seq BETWEEN #{startRowNum} AND #{endRowNum} 
+		</where>
+	 </select>
+	 
+	 
+	
+	<!-- SQL : SELECT ROW Count -->	 
+		 <select  id="getTotalCount"  parameterType="map"	 resultType="java.lang.Integer">
+	  		SELECT COUNT(*)
+	  		FROM(	
+	  				<include refid = "select-purchases"/>
+	  												 ) countTable						
+	 </select>
+	 
+	 	<select  id="getTotalCountSale"  parameterType="search"	 resultType="java.lang.Integer">
+	  		SELECT COUNT(*)
+	  		FROM(	
+	  				<include refid = "select-sales"/>
+	  												 ) countTable						
+	 </select>
+	 
+	 
+	 
+</mapper>
